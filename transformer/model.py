@@ -1,14 +1,15 @@
 import keras
 import keras.backend as K
-from data.vocab import TextEncoder
-from transformer.embedding import Embedding
+from bert.data.vocab import TextEncoder
+from bert.transformer.embedding import Embedding
 from keras.layers import Conv1D, Dropout, Add, Input
-from transformer.layers import MultiHeadAttention, Gelu, LayerNormalization
+from bert.transformer.layers import MultiHeadAttention, Gelu, LayerNormalization
 
 
 class MultiHeadSelfAttention:
-    def __init__(self, n_state: int, n_head: int, attention_dropout: float,
-                 use_attn_mask: bool, layer_id: int, neg_inf: float) -> None:
+    def __init__(self, n_state, n_head, attention_dropout,
+                 use_attn_mask, layer_id, neg_inf):
+        # type: (int, int, float, bool, int, float) -> None
         assert n_state % n_head == 0
         self.c_attn = Conv1D(3 * n_state, 1, name='layer_{}/c_attn'.format(layer_id))
         self.attn = MultiHeadAttention(n_head, n_state, attention_dropout, use_attn_mask,
@@ -22,7 +23,8 @@ class MultiHeadSelfAttention:
 
 
 class PositionWiseFF:
-    def __init__(self, n_state: int, d_hid: int, layer_id: int, accurate_gelu: bool) -> None:
+    def __init__(self, n_state, d_hid, layer_id, accurate_gelu):
+        # type: (int, int, int, bool) -> None
         self.c_fc = Conv1D(d_hid, 1, name='layer_{}/c_fc'.format(layer_id))
         self.activation = Gelu(accurate=accurate_gelu, name='layer_{}/gelu'.format(layer_id))
         self.c_ffn_proj = Conv1D(n_state, 1, name='layer_{}/c_ffn_proj'.format(layer_id))
@@ -33,8 +35,9 @@ class PositionWiseFF:
 
 
 class EncoderLayer:
-    def __init__(self, n_state: int, n_head: int, d_hid: int, residual_dropout: float, attention_dropout: float,
-                 use_attn_mask: bool, layer_id: int, neg_inf: float, ln_epsilon: float, accurate_gelu: bool) -> None:
+    def __init__(self, n_state, n_head, d_hid, residual_dropout, attention_dropout,
+                 use_attn_mask, layer_id, neg_inf, ln_epsilon, accurate_gelu):
+        # type: (int, int, int, float, float, bool, int, float, float, bool) -> None
         self.attention = MultiHeadSelfAttention(n_state, n_head, attention_dropout, use_attn_mask, layer_id, neg_inf)
         self.drop1 = Dropout(residual_dropout, name='layer_{}/ln_1_drop'.format(layer_id))
         self.add1 = Add(name='layer_{}/ln_1_add'.format(layer_id))
@@ -51,12 +54,13 @@ class EncoderLayer:
         return self.ln2(self.add2([n, self.drop2(f)]))
 
 
-def create_transformer(embedding_dim: int = 768, embedding_dropout: float = 0.1, vocab_size: int = 30000,
-                       max_len: int = 512, trainable_pos_embedding: bool = True, num_heads: int = 12,
-                       num_layers: int = 12, attention_dropout: float = 0.1, use_one_embedding_dropout: bool = False,
-                       d_hid: int = 768 * 4, residual_dropout: float = 0.1, use_attn_mask: bool = True,
-                       embedding_layer_norm: bool = False, neg_inf: float = -1e9, layer_norm_epsilon: float = 1e-5,
-                       accurate_gelu: bool = False) -> keras.Model:
+def create_transformer(embedding_dim = 768, embedding_dropout = 0.1, vocab_size= 30000,
+                       max_len = 512, trainable_pos_embedding = True, num_heads = 12,
+                       num_layers = 12, attention_dropout = 0.1, use_one_embedding_dropout = False,
+                       d_hid = 768 * 4, residual_dropout = 0.1, use_attn_mask = True,
+                       embedding_layer_norm = False, neg_inf = -1e9, layer_norm_epsilon = 1e-5,
+                       accurate_gelu = False):
+    # type: (int, float, int, int, bool, int, int, float, bool, int, float, bool, bool, float, float, bool) -> keras.Model
     vocab_size += TextEncoder.SPECIAL_COUNT
     tokens = Input(batch_shape=(None, max_len), name='token_input', dtype='int32')
     segment_ids = Input(batch_shape=(None, max_len), name='segment_input', dtype='int32')

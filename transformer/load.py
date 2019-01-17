@@ -3,13 +3,14 @@ import keras
 import numpy as np
 import tensorflow as tf
 import keras.backend as K
-from data.vocab import TextEncoder
-from google_bert.modeling import BertConfig
-from transformer.model import create_transformer
+from bert.data.vocab import TextEncoder
+from bert.google_bert.modeling import BertConfig
+from bert.transformer.model import create_transformer
 
 
-def load_openai_transformer(path: str = './openai/model/', use_attn_mask: bool = True,
-                            use_one_embedding_dropout: bool = False, max_len: int = 512) -> keras.Model:
+def load_openai_transformer(path = './openai/model/', use_attn_mask = True,
+                            use_one_embedding_dropout = False, max_len = 512):
+    # type: (str, bool, bool, int) -> keras.Model
     with open(path + 'params_shapes.json') as f:
         shapes = json.load(f)
     offsets = np.cumsum([np.prod(shape) for shape in shapes])
@@ -29,8 +30,9 @@ def load_openai_transformer(path: str = './openai/model/', use_attn_mask: bool =
     return model
 
 
-def load_google_bert(base_location: str = './google_bert/downloads/multilingual_L-12_H-768_A-12/',
-                     use_attn_mask: bool = True, max_len: int = 512, verbose: bool = False) -> keras.Model:
+def load_google_bert(base_location = './google_bert/downloads/multilingual_L-12_H-768_A-12/',
+                     use_attn_mask = True, max_len = 512, verbose = False):
+    # type: (str, bool, int, bool) -> keras.Model
     bert_config = BertConfig.from_json_file(base_location + 'bert_config.json')
     init_checkpoint = base_location + 'bert_model.ckpt'
     var_names = tf.train.list_variables(init_checkpoint)

@@ -7,12 +7,12 @@ except:
     print('if you want sentencepiece encoder, please install sentencepiece')
 
 try:
-    from openai.text_utils import TextEncoder as _OpenAITextEncoder
+    from bert.openai.text_utils import TextEncoder as _OpenAITextEncoder
 except:
     print('if you want to use OpenAI\'s encoder and pretrained model, please install spacy, and ftfy')
 
 try:
-    from google_bert.tokenization import FullTokenizer
+    from bert.google_bert.tokenization import FullTokenizer
 except:
     print('if you want to use Google\'s encoder and pretrained models, please clone the bert submodule')
 
@@ -20,7 +20,7 @@ except:
 # TOKEN_IDs = {unk=0, vocab={1..vocab_size-1}, specials(pad,bos,del,eos,msk)}
 
 
-class TextEncoder:
+class TextEncoder(object):
     PAD_OFFSET = 0
     MSK_OFFSET = 1
     BOS_OFFSET = 2
@@ -31,7 +31,8 @@ class TextEncoder:
     BERT_UNUSED_COUNT = 99  # bert pretrained models
     BERT_SPECIAL_COUNT = 4  # they don't have DEL
 
-    def __init__(self, vocab_size: int):
+    def __init__(self, vocab_size):
+        # type: (int) -> None
         # NOTE you MUST always put unk at 0, then regular vocab, then special tokens, and then pos
         self.vocab_size = vocab_size
         self.unk_id = 0
@@ -41,17 +42,20 @@ class TextEncoder:
         self.del_id = vocab_size + self.DEL_OFFSET
         self.eos_id = vocab_size + self.EOS_OFFSET
 
-    def __len__(self) -> int:
+    def __len__(self):
+        # type: (callable) -> int
         return self.vocab_size
 
-    def encode(self, sent: str) -> List[int]:
+    def encode(self, sent):
+        # type: (str) -> List[int]
         raise NotImplementedError()
 
 
 class SentencePieceTextEncoder(TextEncoder):
-    def __init__(self, text_corpus_address: Optional[str], model_name: str = 'spm',
-                 vocab_size: int = 30000, spm_model_type: str = 'unigram') -> None:
-        super().__init__(vocab_size)
+    def __init__(self, text_corpus_address, model_name= 'spm',
+                 vocab_size= 30000, spm_model_type= 'unigram'):
+        # type: (Optional[str], str, int, str) -> None
+        super(SentencePieceTextEncoder, self).__init__(vocab_size)
         if not os.path.exists('{}.model'.format(model_name)):
             if spm_model_type.lower() not in ('unigram', 'bpe', 'char', 'word'):
                 raise ValueError(
@@ -67,28 +71,33 @@ class SentencePieceTextEncoder(TextEncoder):
         self.sp = spm.SentencePieceProcessor()
         self.sp.load('{}.model'.format(model_name))
 
-    def encode(self, sent: str) -> List[int]:
+    def encode(self, sent):
+        # type: (str) -> List[int]
         return self.sp.encode_as_ids(sent)
 
 
 class OpenAITextEncoder(TextEncoder):
-    def __init__(self, encoder_path: str = './openai/model/encoder_bpe_40000.json',
-                 bpe_path: str = './openai/model/vocab_40000.bpe') -> None:
+    def __init__(self, encoder_path='./openai/model/encoder_bpe_40000.json',
+                 bpe_path='./openai/model/vocab_40000.bpe'):
+        # type: (str, str) -> None
         self.encoder = _OpenAITextEncoder(encoder_path, bpe_path)
-        super().__init__(len(self.encoder.encoder))
+        super(OpenAITextEncoder, self).__init__(len(self.encoder.encoder))
 
-    def encode(self, sent: str) -> List[int]:
+    def encode(self, sent):
+        # type: (str) -> List[int]
         return self.encoder.encode([sent], verbose=False)[0]
 
 
 class BERTTextEncoder(TextEncoder):
-    def __init__(self, vocab_file: str, do_lower_case: bool = True) -> None:
+    def __init__(self, vocab_file, do_lower_case = True):
+        # type: (str, bool) -> None
         self.tokenizer = FullTokenizer(vocab_file, do_lower_case)
-        super().__init__(len(self.tokenizer.vocab))
+        super(BERTTextEncoder, self).__init__(len(self.tokenizer.vocab))
         self.bert_unk_id = self.tokenizer.vocab['[UNK]']
         self.bert_msk_id = self.tokenizer.vocab['[MASK]']
 
-    def standardize_ids(self, ids: List[int]) -> List[int]:
+    def standardize_ids(self, ids):
+        # type: (List[int]) -> List[int]
         for i in range(len(ids)):
             if ids[i] == self.bert_unk_id:  # UNK
                 ids[i] = 0
@@ -96,5 +105,6 @@ class BERTTextEncoder(TextEncoder):
                 ids[i] -= self.bert_msk_id
         return ids
 
-    def encode(self, sent: str) -> List[int]:
+    def encode(self, sent):
+        # type: (str) -> List[int]
         return self.standardize_ids(self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(sent)))

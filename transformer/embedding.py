@@ -1,10 +1,11 @@
 import keras
 import numpy as np
-from data.vocab import TextEncoder
-from transformer.layers import LayerNormalization
+from bert.data.vocab import TextEncoder
+from bert.transformer.layers import LayerNormalization
 
 
-def _get_pos_encoding_matrix(max_len: int, d_emb: int) -> np.array:
+def _get_pos_encoding_matrix(max_len, d_emb):
+    # type: (int, int) -> np.array
     pos_enc = np.array(
         [[pos / np.power(10000, 2 * (j // 2) / d_emb) for j in range(d_emb)] if pos != 0 else np.zeros(d_emb) for pos in
          range(max_len)], dtype=np.float32)
@@ -15,10 +16,11 @@ def _get_pos_encoding_matrix(max_len: int, d_emb: int) -> np.array:
 
 # NOTE that for vocab_size you should also add special_count
 class Embedding(keras.layers.Layer):
-    def __init__(self, output_dim: int = 768, dropout: float = 0.1, vocab_size: int = 30000 + TextEncoder.SPECIAL_COUNT,
-                 max_len: int = 512, trainable_pos_embedding: bool = True, use_one_dropout: bool = False,
-                 use_embedding_layer_norm: bool = False, layer_norm_epsilon: float = 1e-5, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, output_dim = 768, dropout = 0.1, vocab_size = 30000 + TextEncoder.SPECIAL_COUNT,
+                 max_len = 512, trainable_pos_embedding = True, use_one_dropout = False,
+                 use_embedding_layer_norm = False, layer_norm_epsilon = 1e-5, **kwargs):
+        # type: (int, float, int, int, bool, bool, bool, float) -> None
+        super(Embedding, self).__init__(**kwargs)
         self.max_len = max_len
         self.use_one_dropout = use_one_dropout
         self.output_dim = output_dim

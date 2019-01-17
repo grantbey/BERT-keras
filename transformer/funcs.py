@@ -14,7 +14,8 @@ def shape_list(x):
     return tmp
 
 
-def split_heads(x, n: int, k: bool = False):  # B, L, C
+def split_heads(x, n, k = False):  # B, L, C
+    # type: (int, bool) -> None
     x_shape = shape_list(x)
     m = x_shape[-1]
     new_x_shape = x_shape[:-1] + [n, m // n]
@@ -30,7 +31,8 @@ def merge_heads(x):
 
 
 # q and v are B, H, L, C//H ; k is B, H, C//H, L ; mask is B, 1, L, L
-def scaled_dot_product_attention_tf(q, k, v, attn_mask, attention_dropout: float, neg_inf: float):
+def scaled_dot_product_attention_tf(q, k, v, attn_mask, attention_dropout, neg_inf):
+    # type: (float, float) -> None
     w = K.batch_dot(q, k)  # w is B, H, L, L
     w = w / K.sqrt(K.cast(shape_list(v)[-1], K.floatx()))
     if attn_mask is not None:
@@ -40,7 +42,8 @@ def scaled_dot_product_attention_tf(q, k, v, attn_mask, attention_dropout: float
     return K.batch_dot(w, v)  # it is B, H, L, C//H [like v]
 
 
-def scaled_dot_product_attention_th(q, k, v, attn_mask, attention_dropout: float, neg_inf: float):
+def scaled_dot_product_attention_th(q, k, v, attn_mask, attention_dropout, neg_inf):
+    # type: (float, float) -> None
     w = theano_matmul(q, k)
     w = w / K.sqrt(K.cast(shape_list(v)[-1], K.floatx()))
     if attn_mask is not None:
@@ -51,7 +54,8 @@ def scaled_dot_product_attention_th(q, k, v, attn_mask, attention_dropout: float
     return theano_matmul(w, v)
 
 
-def multihead_attention(x, attn_mask, n_head: int, n_state: int, attention_dropout: float, neg_inf: float):
+def multihead_attention(x, attn_mask, n_head, n_state, attention_dropout, neg_inf):
+    # type: (int, int, float, float) -> None
     _q, _k, _v = x[:, :, :n_state], x[:, :, n_state:2 * n_state], x[:, :, -n_state:]
     q = split_heads(_q, n_head)  # B, H, L, C//H
     k = split_heads(_k, n_head, k=True)  # B, H, C//H, L

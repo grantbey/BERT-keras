@@ -2,13 +2,13 @@ import math
 import keras.backend as K
 from keras.layers import Layer
 from keras.initializers import Ones, Zeros
-from transformer.funcs import gelu, multihead_attention
+from bert.transformer.funcs import gelu, multihead_attention
 
 
 class MultiHeadAttention(Layer):
-    def __init__(self, n_head: int, n_state: int, attention_dropout: float, use_attn_mask: bool, neg_inf: float,
-                 **kwargs) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, n_head, n_state, attention_dropout, use_attn_mask, neg_inf, **kwargs):
+        # type: (int, int, float, bool, float)-> None
+        super(MultiHeadAttention, self).__init__(**kwargs)
         self.n_head = n_head
         self.n_state = n_state
         self.attention_dropout = attention_dropout
@@ -32,19 +32,20 @@ class MultiHeadAttention(Layer):
             'use_attn_mask': self.use_attn_mask,
             'neg_inf': self.neg_inf,
         }
-        base_config = super().get_config()
+        base_config = super(MultiHeadAttention, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
 
 class LayerNormalization(Layer):
-    def __init__(self, eps: float = 1e-5, **kwargs) -> None:
+    def __init__(self, eps = 1e-5, **kwargs):
+        # type: (float)-> None
         self.eps = eps
-        super().__init__(**kwargs)
+        super(LayerNormalization, self).__init__(**kwargs)
 
     def build(self, input_shape):
         self.gamma = self.add_weight(name='gamma', shape=input_shape[-1:], initializer=Ones(), trainable=True)
         self.beta = self.add_weight(name='beta', shape=input_shape[-1:], initializer=Zeros(), trainable=True)
-        super().build(input_shape)
+        super(LayerNormalization, self).build(input_shape)
 
     def call(self, x, **kwargs):
         u = K.mean(x, axis=-1, keepdims=True)
@@ -59,13 +60,14 @@ class LayerNormalization(Layer):
         config = {
             'eps': self.eps,
         }
-        base_config = super().get_config()
+        base_config = super(LayerNormalization, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
 
 class Gelu(Layer):
-    def __init__(self, accurate: bool = False, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, accurate = False, **kwargs):
+        # type: (bool) -> None
+        super(Gelu, self).__init__(**kwargs)
         self.accurate = accurate
 
     def call(self, inputs, **kwargs):
@@ -84,5 +86,5 @@ class Gelu(Layer):
         config = {
             'accurate': self.accurate,
         }
-        base_config = super().get_config()
+        base_config = super(Gelu, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))

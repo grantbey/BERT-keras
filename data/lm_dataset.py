@@ -1,18 +1,19 @@
 import os
 import random
 import numpy as np
-from contextlib import ExitStack
-from data.vocab import TextEncoder
+from contextlib2 import ExitStack
+from bert.data.vocab import TextEncoder
 from typing import List, Optional, Generator, TextIO, Tuple, Dict
-from data.dataset import (Sentence, pad, msk_sentence, check_sent_len,
+from bert.data.dataset import (Sentence, pad, msk_sentence, check_sent_len,
                           SentenceBatch, TaskDataBatch, TokenTaskData, SentenceTaskData)
 
 
-def lm_generator(text_corpus_address: str, text_encoder: TextEncoder, keep_prob: float = 0.85,
-                 mask_prob: float = 0.15 * 0.8, rand_prob: float = 0.15 * 0.1, min_len: Optional[int] = None,
-                 max_len: Optional[int] = 512, file_jump_prob: float = 0.1, mismatch_prob: float = 0.5,
-                 num_file_pointers: int = 8, is_causal: bool = False, use_single_sentence: bool = False,
-                 batch_size: int = 256) -> Generator[SentenceBatch, None, None]:
+def lm_generator(text_corpus_address, text_encoder, keep_prob = 0.85,
+                 mask_prob = 0.15 * 0.8, rand_prob = 0.15 * 0.1, min_len = None,
+                 max_len = 512, file_jump_prob = 0.1, mismatch_prob = 0.5,
+                 num_file_pointers = 8, is_causal = False, use_single_sentence = False,
+                 batch_size = 256):
+    # type: (str, TextEncoder, float, float, float, Optional[int], Optional[int], float, float, int, bool, bool, int) -> Generator[SentenceBatch, None, None]
     if not (0.0 <= mask_prob <= 1.0 and 0.0 <= rand_prob <= 1.0 and
             0.0 <= keep_prob <= 1.0 and 0.0 <= file_jump_prob <= 1.0):
         raise ValueError('all probablities should be between zero and one')
@@ -36,7 +37,8 @@ def lm_generator(text_corpus_address: str, text_encoder: TextEncoder, keep_prob:
             batch = []
 
 
-def make_next_token_prediction(batch: List[Sentence]) -> List[Sentence]:
+def make_next_token_prediction(batch):
+    # type: (List[Sentence]) -> List[Sentence]
     for item in batch:
         for i in range(len(item.tokens) - 1):
             item.token_classification['lm'].target[i] = item.tokens[i + 1]
@@ -46,7 +48,8 @@ def make_next_token_prediction(batch: List[Sentence]) -> List[Sentence]:
     return batch
 
 
-def _grab_line(files: List[TextIO], file_size: int, jump_prob: float) -> str:
+def _grab_line(files, file_size, jump_prob):
+    # type: (List[TextIO], int, float) -> str
     file = files[random.randrange(len(files))]
     if random.random() < jump_prob:
         file.seek(random.randrange(file_size))
@@ -58,7 +61,8 @@ def _grab_line(files: List[TextIO], file_size: int, jump_prob: float) -> str:
     return random_line
 
 
-def _create_token_task_batch(batch: List[Sentence]) -> Dict[str, TaskDataBatch]:
+def _create_token_task_batch(batch):
+    # type: (List[Sentence]) -> Dict[str, TaskDataBatch]
     batch_keys = set(batch[0].token_classification.keys())
     for item in batch:
         assert batch_keys == set(batch[0].token_classification.keys())
@@ -70,7 +74,8 @@ def _create_token_task_batch(batch: List[Sentence]) -> Dict[str, TaskDataBatch]:
     return result
 
 
-def _create_sent_task_batch(batch: List[Sentence]) -> Dict[str, TaskDataBatch]:
+def _create_sent_task_batch(batch):
+    # type: (List[Sentence]) -> Dict[str, TaskDataBatch]
     batch_keys = set(batch[0].sentence_classification.keys())
     for item in batch:
         assert batch_keys == set(batch[0].sentence_classification.keys())
@@ -82,33 +87,38 @@ def _create_sent_task_batch(batch: List[Sentence]) -> Dict[str, TaskDataBatch]:
     return result
 
 
-def _create_batch(batch: List[Sentence], pad_id: int, max_len: Optional[int] = None) -> SentenceBatch:
+def _create_batch(batch, pad_id, max_len = None):
+    # type: (List[Sentence], int, Optional[int]) -> SentenceBatch
     if max_len is None:
         max_len = max(len(item.tokens) for item in batch)
     padded_batch = [pad(item, pad_id, max_len) for item in batch]
     return SentenceBatch(
-        np.array([item.tokens for item in padded_batch], dtype=np.int32),
-        np.array([item.padding_mask for item in padded_batch], dtype=np.int8),
-        np.array([item.segments for item in padded_batch], dtype=np.int32),
-        _create_token_task_batch(padded_batch), _create_sent_task_batch(padded_batch)
+        tokens=np.array([item.tokens for item in padded_batch], dtype=np.int32),
+        padding_mask=np.array([item.padding_mask for item in padded_batch], dtype=np.int8),
+        segments=np.array([item.segments for item in padded_batch], dtype=np.int32),
+        token_classification=_create_token_task_batch(padded_batch),
+        sentence_classification=_create_sent_task_batch(padded_batch)
     )
 
 
-def _get_lm_generator_single(text_corpus_address: str, text_encoder: TextEncoder, keep_prob: float, mask_prob: float,
-                             rand_prob: float, min_len: Optional[int], max_len: Optional[int], jump_prob,
-                             num_files) -> Generator[Sentence, None, None]:
+def _get_lm_generator_single(text_corpus_address, text_encoder, keep_prob, mask_prob,
+                             rand_prob, min_len, max_len, jump_prob,
+                             num_files):
+    # type: (str, TextEncoder, float, float, float, Optional[int], Optional[int], float, int) -> Generator[Sentence, None, None]
     _max_len = float('inf') if max_len is None else max_len - 2
     _min_len = 0 if min_len is None else min_len - 2
     file_size = os.stat(text_corpus_address).st_size
     with ExitStack() as stack:
         files = [stack.enter_context(open(text_corpus_address)) for _ in range(num_files)]
 
-        def _encode_line(line: str) -> Optional[Sentence]:
+        def _encode_line(line):
+            # type: (str) -> Optional[Sentence]
             return check_sent_len(
                 msk_sentence(text_encoder.encode(line.rstrip()), len(text_encoder), keep_prob, mask_prob, rand_prob),
                 _min_len, _max_len)
 
-        def _yield_sentence(sent: Sentence) -> Sentence:
+        def _yield_sentence(sent):
+            # type: (Sentence) -> Sentence
             lm = sent.token_classification['lm']
             return Sentence(
                 [text_encoder.bos_id] + sent.tokens + [text_encoder.eos_id],
@@ -126,10 +136,10 @@ def _get_lm_generator_single(text_corpus_address: str, text_encoder: TextEncoder
             yield _yield_sentence(encoded)
 
 
-def _get_lm_generator_double(text_corpus_address: str, text_encoder: TextEncoder, keep_prob: float, mask_prob: float,
-                             rand_prob: float, min_len: Optional[int], max_len: Optional[int],
-                             mismatch_prob: float, in_memory: bool, jump_prob: float, num_files: int) -> Generator[
-    Sentence, None, None]:
+def _get_lm_generator_double(text_corpus_address, text_encoder, keep_prob, mask_prob,
+                             rand_prob, min_len, max_len,
+                             mismatch_prob, in_memory, jump_prob, num_files):
+    # type: (str, TextEncoder, float, float, float, Optional[int], Optional[int], float, bool, float, int) -> Generator[Sentence, None, None]
     _max_len = float('inf') if max_len is None else max_len - 3
     _min_len = 0 if min_len is None else min_len - 3
     file_size = os.stat(text_corpus_address).st_size
@@ -144,12 +154,14 @@ def _get_lm_generator_double(text_corpus_address: str, text_encoder: TextEncoder
             files = [stack.enter_context(open(text_corpus_address)) for _ in range(num_files)]
         max_line_number = len(all_lines) if all_lines else float('inf')
 
-        def _encode_line(line: str, half: bool, from_end: bool = False) -> Optional[Sentence]:
+        def _encode_line(line, half, from_end = False):
+            # type: (str, bool, bool) -> Optional[Sentence]
             return check_sent_len(
                 msk_sentence(text_encoder.encode(line.rstrip()), len(text_encoder), keep_prob, mask_prob, rand_prob),
                 _min_len // (2 if half else 1), _max_len // (2 if half else 1), from_end=from_end)
 
-        def _yield_sentence(sent1: Sentence, sent2: Optional[Sentence] = None) -> Sentence:
+        def _yield_sentence(sent1, sent2 = None):
+            # type: (Sentence, Optional[Sentence]) -> Sentence
             lm = sent1.token_classification['lm']
             if sent2 is None:
                 split_idx = random.randint(_min_len // 2, len(sent1.tokens) - _min_len // 2)
@@ -174,8 +186,8 @@ def _get_lm_generator_double(text_corpus_address: str, text_encoder: TextEncoder
                 {}
             )
 
-        def _calc_encoded(line: str, _all_lines: Optional[List[str]] = None, _files: Optional[List[TextIO]] = None) -> \
-                Optional[Tuple[Optional[Sentence], Optional[Sentence]]]:
+        def _calc_encoded(line, _all_lines = None, _files = None):
+            # type: (str, Optional[List[str]], Optional[List[TextIO]]) -> Optional[Tuple[Optional[Sentence], Optional[Sentence]]]
             if random.random() < mismatch_prob:
                 _encoded1 = _encode_line(line, half=True)
                 if _all_lines is not None:
@@ -203,7 +215,8 @@ def _get_lm_generator_double(text_corpus_address: str, text_encoder: TextEncoder
             yield _yield_sentence(encoded1, encoded2)
 
 
-def dummy_lm_generator(vocab_size: int, max_len: int, batch_size: int, steps: int, easy: bool = True):  # identity
+def dummy_lm_generator(vocab_size, max_len, batch_size, steps, easy = True):  # identity
+    # type: (inbt, int, int, int, bool) -> None
     def dummy_generator():
         for _ in range(steps):
             seq_len = random.randint(1, max_len - 1)
