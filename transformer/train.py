@@ -13,7 +13,9 @@ def _mask_loss(y_true, y_pred, y_mask, element_wise_loss):
 
 def classification_loss(y_true, y_pred):
     return K.sparse_categorical_crossentropy(y_true, y_pred, from_logits=False)
+    #return K.binary_crossentropy(K.reshape(y_true, (-1,1,1)), y_pred, from_logits=False)
     #return K.binary_crossentropy(y_true, y_pred, from_logits=False)
+    #return K.categorical_crossentropy(y_true, y_pred, from_logits=False)
 
 def masked_classification_loss(y_true, y_pred, y_mask):
     return _mask_loss(y_true, y_pred, y_mask, classification_loss)
@@ -104,7 +106,7 @@ def train_model(base_model, is_causal, tasks_meta_data, pretrain_generator=None,
             x = [batch.tokens, batch.segments, generate_pos_ids(batch_size, max_len)]
             y = []
             if uses_attn_mask:
-                x.append(create_attention_mask(batch.padding_mask, is_causal))
+                x.append(create_attention_mask(batch.padding_mask, is_causal))  # index 3
             for task_name in task_nodes.keys():
                 if is_pretrain:
                     cond = all_tasks[task_name].weight_scheduler.active_in_pretrain
@@ -115,7 +117,7 @@ def train_model(base_model, is_causal, tasks_meta_data, pretrain_generator=None,
                         task_data_batch = batch.sentence_classification[task_name]
                     else:
                         task_data_batch = batch.token_classification[task_name]
-                    x.append(task_data_batch.target)  # These are the labels / y values
+                    x.append(task_data_batch.target)  # index 4 // These are the labels // y values
                     if all_tasks[task_name].is_token_level:
                         x.append(task_data_batch.target_mask)
                     else:
