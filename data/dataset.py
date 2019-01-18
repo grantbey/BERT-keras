@@ -159,13 +159,13 @@ def pad(sentence, pad_id, max_len, is_post_pad = True):
     pad_len = max_len - len(sentence.tokens)
     if pad_len == 0:
         return sentence
-    return Sentence(_pad_seq(sentence.tokens, pad_id, pad_len, is_post_pad),
-                    _pad_seq(sentence.padding_mask, False, pad_len, is_post_pad),
-                    _pad_seq(sentence.segments, 0, pad_len, is_post_pad),
-                    {k: TokenTaskData(_pad_seq(v.target, 0, pad_len, is_post_pad),
+    return Sentence(tokens=_pad_seq(sentence.tokens, pad_id, pad_len, is_post_pad),
+                    padding_mask=_pad_seq(sentence.padding_mask, False, pad_len, is_post_pad),
+                    segments=_pad_seq(sentence.segments, 0, pad_len, is_post_pad),
+                    token_classification={k: TokenTaskData(_pad_seq(v.target, 0, pad_len, is_post_pad),
                                       _pad_seq(v.target_mask, False, pad_len, is_post_pad)) for k, v in
                      sentence.token_classification.items()} if sentence.token_classification is not None else {},
-                    {k: SentenceTaskData(v.target, v.target_index + (0 if is_post_pad else pad_len)) for k, v in
+                    sentence_classification={k: SentenceTaskData(v.target, v.target_index + (0 if is_post_pad else pad_len)) for k, v in
                      sentence.sentence_classification.items()} if sentence.sentence_classification is not None else {})
 
 
