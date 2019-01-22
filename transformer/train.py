@@ -42,9 +42,11 @@ def load_model(weights_path, base_model, tasks_meta_data):
     return model
 
 
-def train_model(base_model, is_causal, tasks_meta_data, pretrain_generator=None, finetune_generator=None,
-                pretrain_epochs=1, pretrain_optimizer='adam', pretrain_steps=1000000, pretrain_callbacks=None,
-                finetune_epochs=1, finetune_optimizer='adam', finetune_steps=10000, finetune_callbacks=None,
+def train_model(base_model, is_causal, tasks_meta_data,
+                pretrain_generator=None, pretrain_steps=1000000, pretrain_test_generator=None, pretrain_test_steps=200000,
+                finetune_generator=None, finetune_steps=10000, finetune_test_generator=None, finetune_test_steps=2000,
+                pretrain_epochs=1, pretrain_optimizer='adam', pretrain_callbacks=None,
+                finetune_epochs=1, finetune_optimizer='adam', finetune_callbacks=None,
                 verbose=0, TPUStrategy=None):
     # type: (keras.Model, bool, List[TaskMetadata], Any, Any, int, Any, int, Optional[Any], int, Any, int, Optional[Any], int, Optional['tf.contrib.tpu.TPUDistributionStrategy']) -> keras.Model
     if TPUStrategy is not None:
@@ -146,6 +148,8 @@ def train_model(base_model, is_causal, tasks_meta_data, pretrain_generator=None,
                 _inputs.append(task_nodes[task_name]['loss_weight'])
                 _outputs.append(task_nodes[task_name]['loss'])
         _generator = get_generator(pretrain_generator if is_pretrain else finetune_generator, is_pretrain)
+        if finetune_test_generator is not None or pretrain_test_generator is not None:
+            _test_generator = get_generator(pretrain_test_generator if is_pretrain else finetune_test_generator, is_pretrain)
         _model = keras.Model(inputs=_inputs, outputs=_outputs)
         if TPUStrategy is not None:
             '''
@@ -157,9 +161,14 @@ def train_model(base_model, is_causal, tasks_meta_data, pretrain_generator=None,
             '''
             _model = tf.contrib.tpu.keras_to_tpu_model(_model, strategy=TPUStrategy)
         _model.compile(pretrain_optimizer if is_pretrain else finetune_optimizer, loss=pass_through_loss)
-        _model.fit_generator(_generator, steps_per_epoch=pretrain_steps if is_pretrain else finetune_steps,
-                             verbose=verbose, callbacks=pretrain_callbacks if is_pretrain else finetune_callbacks,
-                             shuffle=False, epochs=pretrain_epochs if is_pretrain else finetune_epochs)
+        _model.fit_generator(generator=_generator,
+                             steps_per_epoch=pretrain_steps if is_pretrain else finetune_steps,
+                             verbose=verbose,
+                             callbacks=pretrain_callbacks if is_pretrain else finetune_callbacks,
+                             shuffle=False,
+                             epochs=pretrain_epochs if is_pretrain else finetune_epochs,
+                             validation_data=_test_generator,
+                             validation_steps=pretrain_test_steps if is_pretrain else finetune_test_steps)
 
     if pretrain_generator is not None:
         train_step(True)
