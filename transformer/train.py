@@ -17,12 +17,13 @@ def classification_loss(y_true, y_pred):
     #return K.binary_crossentropy(y_true, y_pred, from_logits=False)
     #return K.categorical_crossentropy(y_true, y_pred, from_logits=False)
 
+
 def masked_classification_loss(y_true, y_pred, y_mask):
     return _mask_loss(y_true, y_pred, y_mask, classification_loss)
 
 
 def sparse_gather(y_pred, target_indices, task_name):
-    # if K.backend() == 'tensorflowx':
+    # if K.backend() == 'tensorflow':
     #     import tensorflow as tf
     #     one_hot = Lambda(lambda x: tf.one_hot(x[1], x[0].shape[1], dtype='int32')[:,0,:], name=task_name + '_flatten')([y_pred, target_indices])
     #     return Lambda(lambda x: tf.dynamic_partition(x[0], x[1], 2)[1], name=task_name + '_gather')([y_pred,one_hot])
@@ -47,7 +48,7 @@ def train_model(base_model, is_causal, tasks_meta_data,
                 finetune_generator=None, finetune_steps=10000, finetune_test_generator=None, finetune_test_steps=2000,
                 pretrain_epochs=1, pretrain_optimizer='adam', pretrain_callbacks=None,
                 finetune_epochs=1, finetune_optimizer='adam', finetune_callbacks=None,
-                verbose=0, TPUStrategy=None):
+                verbose=0, TPUStrategy=None, gpus=1):
     # type: (keras.Model, bool, List[TaskMetadata], Any, Any, int, Any, int, Optional[Any], int, Any, int, Optional[Any], int, Optional['tf.contrib.tpu.TPUDistributionStrategy']) -> keras.Model
     if TPUStrategy is not None:
         import tensorflow as tf
@@ -88,7 +89,7 @@ def train_model(base_model, is_causal, tasks_meta_data,
             # task_mask. I.e. uses task_mask input above to select only BERT base model outputs that are needed.
             # Note that this is a Lambda layer
             decoder_input = sparse_gather(y_pred=base_model.outputs[0], target_indices=task_mask, task_name=task.name)
-            logits = Dense(units=task.num_classes, activation='softmax', name=task.name + '_logits')(Dropout(task.dropout)(decoder_input))
+            logits = Dense(units=task.num_classes, activation='softmax', kernel_initializer='he_uniform', name=task.name + '_logits')(Dropout(task.dropout)(decoder_input))
             task_target = Input(batch_shape=(None, 1), dtype='int32', name=task.name + '_target_input')
             task_loss = Lambda(lambda x: x[0] * classification_loss(x[1], x[2]), name=task.name + '_loss')([task_loss_weight, task_target, logits])
             sent_level_mask_inputs.append(task_mask)
@@ -150,7 +151,11 @@ def train_model(base_model, is_causal, tasks_meta_data,
         _generator = get_generator(pretrain_generator if is_pretrain else finetune_generator, is_pretrain)
         if finetune_test_generator is not None or pretrain_test_generator is not None:
             _test_generator = get_generator(pretrain_test_generator if is_pretrain else finetune_test_generator, is_pretrain)
-        _model = keras.Model(inputs=_inputs, outputs=_outputs)
+        if gpus == 1:
+            _model = keras.Model(inputs=_inputs, outputs=_outputs)
+        else:
+            from keras.utils import multi_gpu_model
+            _model = multi_gpu_model(keras.Model(inputs=_inputs, outputs=_outputs), gpus=gpus)
         if TPUStrategy is not None:
             '''
             Create TPUStrategy like this:
