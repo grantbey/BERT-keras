@@ -12,8 +12,8 @@ def _mask_loss(y_true, y_pred, y_mask, element_wise_loss):
 
 
 def classification_loss(y_true, y_pred):
-    return K.sparse_categorical_crossentropy(y_true, y_pred, from_logits=False)
-    #return K.binary_crossentropy(K.reshape(y_true, (-1,1,1)), y_pred, from_logits=False)
+    #return K.sparse_categorical_crossentropy(y_true, y_pred, from_logits=False)
+    return K.binary_crossentropy(K.reshape(y_true, (-1,1,1)), y_pred, from_logits=False)
     #return K.binary_crossentropy(y_true, y_pred, from_logits=False)
     #return K.categorical_crossentropy(y_true, y_pred, from_logits=False)
 
@@ -89,8 +89,8 @@ def train_model(base_model, is_causal, tasks_meta_data,
             # task_mask. I.e. uses task_mask input above to select only BERT base model outputs that are needed.
             # Note that this is a Lambda layer
             decoder_input = sparse_gather(y_pred=base_model.outputs[0], target_indices=task_mask, task_name=task.name)
-            logits = Dense(units=task.num_classes, activation='softmax', kernel_initializer='he_uniform', name=task.name + '_logits')(Dropout(task.dropout)(decoder_input))
-            task_target = Input(batch_shape=(None, 1), dtype='int32', name=task.name + '_target_input')
+            logits = Dense(units=task.num_classes, activation='sigmoid', kernel_initializer='he_uniform', name=task.name + '_logits')(Dropout(task.dropout)(decoder_input))
+            task_target = Input(batch_shape=(None, 1), dtype='float32', name=task.name + '_target_input')
             task_loss = Lambda(lambda x: x[0] * classification_loss(x[1], x[2]), name=task.name + '_loss')([task_loss_weight, task_target, logits])
             sent_level_mask_inputs.append(task_mask)
 
