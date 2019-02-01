@@ -48,8 +48,8 @@ def train_model(base_model, is_causal, tasks_meta_data,
                 finetune_generator=None, finetune_steps=10000, finetune_test_generator=None, finetune_test_steps=2000,
                 pretrain_epochs=1, pretrain_optimizer='adam', pretrain_callbacks=None,
                 finetune_epochs=1, finetune_optimizer='adam', finetune_callbacks=None,
-                verbose=0, TPUStrategy=None, gpus=1):
-    # type: (keras.Model, bool, List[TaskMetadata], Any, Any, int, Any, int, Optional[Any], int, Any, int, Optional[Any], int, Optional['tf.contrib.tpu.TPUDistributionStrategy']) -> keras.Model
+                verbose=0, TPUStrategy=None, gpus=1, class_weight=None):
+    # type: (keras.Model, bool, List[TaskMetadata], Any, Any, int, Any, int, Optional[Any], int, Any, int, Optional[Any], int, Optional['tf.contrib.tpu.TPUDistributionStrategy'], int, Optional[Dict]) -> keras.Model
     if TPUStrategy is not None:
         import tensorflow as tf
     token_input = base_model.inputs[0]
@@ -173,7 +173,8 @@ def train_model(base_model, is_causal, tasks_meta_data,
                              shuffle=False,
                              epochs=pretrain_epochs if is_pretrain else finetune_epochs,
                              validation_data=_test_generator,
-                             validation_steps=pretrain_test_steps if is_pretrain else finetune_test_steps)
+                             validation_steps=pretrain_test_steps if is_pretrain else finetune_test_steps,
+                             class_weight=class_weight)
 
     if pretrain_generator is not None:
         train_step(True)
